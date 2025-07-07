@@ -215,6 +215,56 @@
     )
 )
 
+;; Advanced donation tracking and analytics function
+;; This function provides comprehensive donation analytics for transparency and reporting
+(define-public (generate-donation-report 
+    (charity-id uint) 
+    (start-block uint) 
+    (end-block uint)
+    (min-donation-amount uint))
+    (let ((charity-data (try! (get-charity-or-fail charity-id))))
+        (asserts! (is-eq tx-sender (get wallet charity-data)) ERR-NOT-AUTHORIZED)
+        (asserts! (<= start-block end-block) ERR-INVALID-AMOUNT)
+        
+        ;; Create comprehensive report data structure
+        (let ((report-data {
+                charity-info: {
+                    charity-id: charity-id,
+                    name: (get name charity-data),
+                    total-raised: (get total-raised charity-data),
+                    is-verified: (get is-verified charity-data)
+                },
+                report-period: {
+                    start-block: start-block,
+                    end-block: end-block,
+                    current-block: block-height
+                },
+                filters: {
+                    min-donation-amount: min-donation-amount
+                },
+                analytics: {
+                    report-generated-at: block-height,
+                    platform-total: (var-get total-platform-donations),
+                    charity-percentage: (if (> (var-get total-platform-donations) u0)
+                                          (/ (* (get total-raised charity-data) u10000) (var-get total-platform-donations))
+                                          u0)
+                }
+            }))
+            
+            ;; Log report generation event and return report data
+            (print {
+                event: "donation-report-generated",
+                charity-id: charity-id,
+                report-period: (get report-period report-data),
+                generated-by: tx-sender,
+                timestamp: block-height
+            })
+            
+            (ok report-data)
+        )
+    )
+)
+
 ;; Read-only functions for querying data
 (define-read-only (get-charity-info (charity-id uint))
     (map-get? charities { charity-id: charity-id })
